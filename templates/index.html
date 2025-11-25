@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Rutas Avanzado - Santa Cruz</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.6/dist/vis-network.min.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                🗺️ Sistema de Rutas Avanzado
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <button class="btn btn-outline-success btn-sm me-2" onclick="mostrarModalCiudad()">
+                            ➕ Agregar Ciudad
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-outline-primary btn-sm me-2" onclick="mostrarModalRuta()">
+                            🛣️ Agregar Ruta
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-outline-info btn-sm me-2" onclick="mostrarTodasRutas()">
+                            📋 Todas las Rutas
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <div class="container mt-4">
+        <!-- Card de Búsqueda -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h4 class="card-title">🔍 Calcular Ruta Óptima</h4>
+                <form action="/ruta" method="post" class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">Ciudad Origen:</label>
+                        <select name="origen" class="form-select" required>
+                            {% for c in ciudades %}
+                                <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Ciudad Destino:</label>
+                        <select name="destino" class="form-select" required>
+                            {% for c in ciudades %}
+                                <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Criterio de Optimización:</label>
+                        <select name="criterio" class="form-select">
+                            <option value="distancia">📏 Menor Distancia</option>
+                            <option value="tiempo">⏱️ Menor Tiempo</option>
+                            <option value="peaje">💰 Menor Peaje</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">
+                            🚀 Calcular Ruta
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Panel de Gestión -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">🏙️ Gestión de Ciudades</h5>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" onclick="mostrarModalCiudad()">
+                                ➕ Agregar Ciudad
+                            </button>
+                            <button class="btn btn-warning" onclick="mostrarEliminarCiudad()">
+                                🗑️ Eliminar Ciudad
+                            </button>
+                            <button class="btn btn-info" onclick="listarCiudades()">
+                                📊 Listar Ciudades
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">🛣️ Gestión de Rutas</h5>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" onclick="mostrarModalRuta()">
+                                ➕ Agregar Ruta
+                            </button>
+                            <button class="btn btn-warning" onclick="mostrarEliminarRuta()">
+                                🗑️ Eliminar Ruta
+                            </button>
+                            <button class="btn btn-info" onclick="listarRutas()">
+                                📋 Listar Rutas
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grafo Interactivo -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">🗺️ Mapa Interactivo de Rutas</h5>
+                <div id="mynetwork"></div>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        💡 <strong>Interactividad:</strong> Arrastra nodos • Doble clic para info • Zoom con rueda del mouse
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="row mt-4" id="estadisticas">
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <h3 id="total-ciudades">0</h3>
+                    <p>Ciudades Conectadas</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <h3 id="total-rutas">0</h3>
+                    <p>Rutas Disponibles</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <h3 id="distancia-promedio">0</h3>
+                    <p>Distancia Promedio (km)</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <h3>3</h3>
+                    <p>Criterios de Optimización</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modales -->
+    <!-- Modal Agregar Ciudad -->
+    <div class="modal fade" id="modalCiudad" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">➕ Agregar Nueva Ciudad</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formCiudad">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre de la Ciudad:</label>
+                            <input type="text" class="form-control" name="nombre" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Ciudad:</label>
+                            <select class="form-select" name="tipo">
+                                <option value="normal">🏘️ Normal</option>
+                                <option value="capital">🏛️ Capital</option>
+                                <option value="turistica">🏕️ Turística</option>
+                                <option value="comercial">🏬 Comercial</option>
+                                <option value="industrial">🏭 Industrial</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="agregarCiudad()">Agregar Ciudad</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Ciudad -->
+    <div class="modal fade" id="modalEliminarCiudad" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🗑️ Eliminar Ciudad</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Selecciona la ciudad a eliminar:</label>
+                        <select class="form-select" id="selectEliminarCiudad">
+                            {% for c in ciudades %}
+                                <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>⚠️ Advertencia:</strong> Esta acción eliminará la ciudad y TODAS sus rutas conectadas.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" onclick="eliminarCiudad()">Eliminar Ciudad</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Agregar Ruta -->
+    <div class="modal fade" id="modalRuta" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🛣️ Agregar Nueva Ruta</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formRuta">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Ciudad Origen:</label>
+                                <select class="form-select" name="origen" required>
+                                    {% for c in ciudades %}
+                                        <option value="{{ c }}">{{ c }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Ciudad Destino:</label>
+                                <select class="form-select" name="destino" required>
+                                    {% for c in ciudades %}
+                                        <option value="{{ c }}">{{ c }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Distancia (km):</label>
+                                <input type="number" class="form-control" name="distancia" min="1" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tiempo (min):</label>
+                                <input type="number" class="form-control" name="tiempo" min="1" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Peaje (bs):</label>
+                                <input type="number" class="form-control" name="peaje" min="0" required>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="agregarRuta()">Agregar Ruta</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Eliminar Ruta -->
+    <div class="modal fade" id="modalEliminarRuta" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🗑️ Eliminar Ruta/Carretera</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Ciudad Origen:</label>
+                            <select class="form-select" id="selectEliminarOrigen">
+                                {% for c in ciudades %}
+                                    <option value="{{ c }}">{{ c }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ciudad Destino:</label>
+                            <select class="form-select" id="selectEliminarDestino">
+                                {% for c in ciudades %}
+                                    <option value="{{ c }}">{{ c }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning mt-3">
+                        <strong>⚠️ Advertencia:</strong> Esta acción eliminará la carretera entre estas dos ciudades.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" onclick="eliminarRuta()">Eliminar Ruta</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Listar Rutas -->
+    <div class="modal fade" id="modalListarRutas" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📋 Todas las Rutas Disponibles</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="contenidoRutas">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <p class="mt-2">Cargando rutas...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Listar Ciudades -->
+    <div class="modal fade" id="modalListarCiudades" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🏙️ Lista de Ciudades</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="contenidoCiudades">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <p class="mt-2">Cargando ciudades...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='graph.js') }}"></script>
+    <script>
+        // Funciones para mostrar modales
+        function mostrarModalCiudad() {
+            new bootstrap.Modal(document.getElementById('modalCiudad')).show();
+        }
+
+        function mostrarModalRuta() {
+            new bootstrap.Modal(document.getElementById('modalRuta')).show();
+        }
+
+        function mostrarEliminarCiudad() {
+            new bootstrap.Modal(document.getElementById('modalEliminarCiudad')).show();
+        }
+
+        function mostrarEliminarRuta() {
+            new bootstrap.Modal(document.getElementById('modalEliminarRuta')).show();
+        }
+
+        function mostrarTodasRutas() {
+            listarTodasRutas();
+        }
+
+        // Funciones de gestión
+        function agregarCiudad() {
+            const form = document.getElementById('formCiudad');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            fetch('/api/ciudades', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    alert(result.mensaje || 'Ciudad agregada correctamente');
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                alert('Error al agregar ciudad: ' + error);
+            });
+        }
+
+        function eliminarCiudad() {
+            const ciudad = document.getElementById('selectEliminarCiudad').value;
+            
+            if (!confirm(`¿Estás seguro de que quieres eliminar la ciudad "${ciudad}" y todas sus rutas?`)) {
+                return;
+            }
+            
+            fetch('/api/eliminar-ciudad', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre: ciudad })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    alert(result.mensaje);
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                alert('Error al eliminar ciudad: ' + error);
+            });
+        }
+
+        function agregarRuta() {
+            const form = document.getElementById('formRuta');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            // Convertir a números antes de enviar
+            data.distancia = parseInt(data.distancia);
+            data.tiempo = parseInt(data.tiempo);
+            data.peaje = parseInt(data.peaje);
+            
+            fetch('/api/rutas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    alert(result.mensaje || 'Ruta agregada correctamente');
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                alert('Error al agregar ruta: ' + error);
+            });
+        }
+
+        function eliminarRuta() {
+            const origen = document.getElementById('selectEliminarOrigen').value;
+            const destino = document.getElementById('selectEliminarDestino').value;
+            
+            if (!confirm(`¿Estás seguro de que quieres eliminar la ruta entre "${origen}" y "${destino}"?`)) {
+                return;
+            }
+            
+            fetch('/api/eliminar-carretera', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ origen, destino })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    alert(result.mensaje);
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                alert('Error al eliminar ruta: ' + error);
+            });
+        }
+
+        function listarRutas() {
+            fetch('/api/rutas')
+                .then(response => response.json())
+                .then(data => {
+                    const contenido = document.getElementById('contenidoRutas');
+                    let html = `<h6>Total de rutas: ${data.total_rutas}</h6>`;
+                    
+                    if (data.rutas && data.rutas.length > 0) {
+                        html += '<div class="table-responsive"><table class="table table-striped table-hover"><thead><tr><th>Origen</th><th>Destino</th><th>Distancia</th><th>Tiempo</th><th>Peaje</th><th>Costo Total</th></tr></thead><tbody>';
+                        
+                        data.rutas.forEach(ruta => {
+                            html += `<tr>
+                                <td>${ruta.origen}</td>
+                                <td>${ruta.destino}</td>
+                                <td>${ruta.distancia} km</td>
+                                <td>${ruta.tiempo} min</td>
+                                <td>${ruta.peaje} bs</td>
+                                <td>${ruta.costo_total} pts</td>
+                            </tr>`;
+                        });
+                        
+                        html += '</tbody></table></div>';
+                    } else {
+                        html += '<p class="text-muted">No hay rutas disponibles.</p>';
+                    }
+                    
+                    contenido.innerHTML = html;
+                    new bootstrap.Modal(document.getElementById('modalListarRutas')).show();
+                })
+                .catch(error => {
+                    alert('Error al cargar rutas: ' + error);
+                });
+        }
+
+        function listarCiudades() {
+            fetch('/api/ciudades')
+                .then(response => response.json())
+                .then(data => {
+                    const contenido = document.getElementById('contenidoCiudades');
+                    let html = `<h6>Total de ciudades: ${data.length}</h6>`;
+                    
+                    if (data && data.length > 0) {
+                        html += '<div class="table-responsive"><table class="table table-striped table-hover"><thead><tr><th>Ciudad</th><th>Tipo</th><th>Conexiones</th><th>Acciones</th></tr></thead><tbody>';
+                        
+                        data.forEach(ciudad => {
+                            html += `<tr>
+                                <td>${ciudad.nombre}</td>
+                                <td>${ciudad.tipo}</td>
+                                <td>${ciudad.conexiones || 0}</td>
+                                <td><button class="btn btn-sm btn-outline-info" onclick="verDetallesCiudad('${ciudad.nombre}')">Ver Detalles</button></td>
+                            </tr>`;
+                        });
+                        
+                        html += '</tbody></table></div>';
+                    } else {
+                        html += '<p class="text-muted">No hay ciudades disponibles.</p>';
+                    }
+                    
+                    contenido.innerHTML = html;
+                    new bootstrap.Modal(document.getElementById('modalListarCiudades')).show();
+                })
+                .catch(error => {
+                    alert('Error al cargar ciudades: ' + error);
+                });
+        }
+
+        function listarTodasRutas() {
+            fetch('/api/todas-rutas-posibles')
+                .then(response => response.json())
+                .then(data => {
+                    const contenido = document.getElementById('contenidoRutas');
+                    let html = `
+                        <h6>Resumen de Rutas</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center">
+                                        <h5>${data.total_rutas_calculadas}</h5>
+                                        <small>Total Rutas</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <h5>${data.ciudades_totales}</h5>
+                                        <small>Ciudades</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <h5>3</h5>
+                                        <small>Criterios</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    if (data.rutas && data.rutas.length > 0) {
+                        html += '<div class="table-responsive"><table class="table table-striped table-hover"><thead><tr><th>Origen</th><th>Destino</th><th>Criterio</th><th>Ruta</th><th>Costo</th><th>Paradas</th></tr></thead><tbody>';
+                        
+                        data.rutas.forEach(ruta => {
+                            const icono = ruta.criterio === 'distancia' ? '📏' : ruta.criterio === 'tiempo' ? '⏱️' : '💰';
+                            html += `<tr>
+                                <td>${ruta.origen}</td>
+                                <td>${ruta.destino}</td>
+                                <td>${icono} ${ruta.criterio}</td>
+                                <td>${ruta.camino.join(' → ')}</td>
+                                <td>${ruta.costo}</td>
+                                <td>${ruta.paradas}</td>
+                            </tr>`;
+                        });
+                        
+                        html += '</tbody></table></div>';
+                    } else {
+                        html += '<p class="text-muted">No se pudieron calcular rutas.</p>';
+                    }
+                    
+                    contenido.innerHTML = html;
+                    new bootstrap.Modal(document.getElementById('modalListarRutas')).show();
+                })
+                .catch(error => {
+                    alert('Error al cargar todas las rutas: ' + error);
+                });
+        }
+
+        function verDetallesCiudad(nombre) {
+            fetch(`/api/ciudad/${nombre}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        let detalles = `🏙️ <strong>${data.nombre}</strong>\n`;
+                        detalles += `📊 Tipo: ${data.tipo}\n`;
+                        detalles += `🔗 Conexiones: ${data.conexiones}\n\n`;
+                        detalles += `🛣️ <strong>Rutas conectadas:</strong>\n`;
+                        
+                        if (data.rutas && data.rutas.length > 0) {
+                            data.rutas.forEach(ruta => {
+                                detalles += `• ${ruta.destino} (${ruta.distancia}km, ${ruta.tiempo}min, ${ruta.peaje}bs)\n`;
+                            });
+                        } else {
+                            detalles += 'No tiene rutas conectadas\n';
+                        }
+                        
+                        alert(detalles);
+                    }
+                })
+                .catch(error => {
+                    alert('Error al cargar detalles: ' + error);
+                });
+        }
+
+        // Cargar estadísticas al iniciar
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/api/estadisticas')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-ciudades').textContent = data.total_ciudades;
+                    document.getElementById('total-rutas').textContent = data.total_rutas;
+                    document.getElementById('distancia-promedio').textContent = data.distancia_promedio;
+                })
+                .catch(error => console.error('Error cargando estadísticas:', error));
+        });
+    </script>
+</body>
+</html>
